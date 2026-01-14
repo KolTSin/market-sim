@@ -56,8 +56,8 @@ class MarketServer:
                     if not data:
                         break
                     msg = json.loads(data.decode())
-                    agent_id = msg["agent_id"]
-                    if agent_id not in self.env.agent_accounts:
+                    agent_id = msg.get("agent_id")
+                    if agent_id and agent_id not in self.env.agent_accounts:
                         self.env.add_account(agent_id)
                         print(f"[SERVER] Registered new agent: {agent_id}")
                     response = self.process_message(msg, addr)

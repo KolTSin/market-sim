@@ -11,6 +11,19 @@ class Environment:
         self.pending_orders: list[dict] = [] # Orders to be processed each tick
         self.agent_accounts: dict = {}
 
+    @staticmethod
+    def _trade_to_dict(trade) -> dict:
+        return {
+            "price": trade.price,
+            "volume": trade.volume,
+            "symbol": trade.symbol,
+            "buyer": trade.buyer,
+            "seller": trade.seller,
+            "buyer_order": trade.buyer_order,
+            "seller_order": trade.seller_order,
+            "time": trade.time,
+        }
+
     def add_account(self, agent_id):
         """Create a new account for an agent (identified by addr / agent_id)."""
         self.agent_accounts[agent_id] = {
@@ -57,7 +70,7 @@ class Environment:
 
     def process_orders(self):
         """Execute all pending orders for this tick."""
-        all_trades = []
+        all_trades: list[dict] = []
         for order in self.pending_orders:
             symbol = order["symbol"]
             inst = self.instruments[symbol]
@@ -70,7 +83,7 @@ class Environment:
             )
             for t in trades:
                 t.time = self.time
-                all_trades.append(t)
+                all_trades.append(self._trade_to_dict(t))
                 # NEW: update accounts based on this trade
                 self.update_accounts(t)
 
@@ -143,7 +156,10 @@ class Environment:
     def update_prices(self):
         """Update instrument prices based on last trades."""
         for sym, inst in self.instruments.items():
-            trades = [t for t in self.trade_log if t.symbol == sym and t.time == self.time]
+            trades = [
+                t for t in self.trade_log
+                if t["symbol"] == sym and t["time"] == self.time
+            ]
             if trades:
                 # Update price to last trade price
-                inst.price = trades[-1].price
+                inst.price = trades[-1]["price"]

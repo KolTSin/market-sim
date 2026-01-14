@@ -70,7 +70,7 @@ class OrderBook:
 
             # Prevent self-trade: if the best order belongs to the same agent,
             # temporarily remove it and continue to the next one.
-            if best.agent_id == incoming.agent_id:
+            if incoming.agent_id and best.agent_id and best.agent_id == incoming.agent_id:
                 heapq.heappop(opposite)
                 skipped.append(best)
                 continue
@@ -84,7 +84,7 @@ class OrderBook:
             heapq.heappop(opposite)
 
             traded_vol = min(incoming.quantity, best.quantity)
-            trade_price = best.price
+            trade_price = incoming.price
 
             trades.append(Trade(
                 price=trade_price,
@@ -112,6 +112,58 @@ class OrderBook:
         return trades
 
     # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _trade_to_dict(trade: Trade) -> dict:
+        return {
+            "price": trade.price,
+            "volume": trade.volume,
+            "symbol": trade.symbol,
+            "buyer": trade.buyer,
+            "seller": trade.seller,
+            "buyer_order": trade.buyer_order,
+            "seller_order": trade.seller_order,
+            "time": trade.time,
+        }
+
+    def _match_orders(self) -> list[dict]:
+        """Match resting orders and return serialized trades."""
+        while self.bids and self.asks:
+            best_bid = self.bids[0]
+            best_ask = self.asks[0]
+            if best_bid.price < best_ask.price:
+                break
+
+            bid = heapq.heappop(self.bids)
+            ask = heapq.heappop(self.asks)
+
+            traded_vol = min(bid.quantity, ask.quantity)
+            trade_price = ask.price
+
+            trade = Trade(
+                price=trade_price,
+                volume=traded_vol,
+                symbol=self.symbol,
+                buyer=bid.agent_id,
+                seller=ask.agent_id,
+                buyer_order=bid.order_id,
+                seller_order=ask.order_id,
+                time=self.current_tick,
+            )
+
+            self.trades.append(trade)
+
+            bid.quantity -= traded_vol
+            ask.quantity -= traded_vol
+
+            if bid.quantity > 0:
+                heapq.heappush(self.bids, bid)
+            if ask.quantity > 0:
+                heapq.heappush(self.asks, ask)
+
+        matched_trades = self.trades
+        self.trades = []
+        return [self._trade_to_dict(trade) for trade in matched_trades]
 
     def _execute_market_order(self, order: Order) -> dict:
         """Execute a market order against the opposite book (no book entry)."""
